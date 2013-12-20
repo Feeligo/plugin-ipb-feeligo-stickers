@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="utf-8"?>
+<hookexport>
+  <hookdata>
+    <config>
+      <hook_name>Stickers by Feeligo</hook_name>
+      <hook_desc>Lets users add beautiful stickers to their posts</hook_desc>
+      <hook_author>Feeligo</hook_author>
+      <hook_email>tech@feeligo.com</hook_email>
+      <hook_website>http://www.feeligo.com/stickers</hook_website>
+      <hook_update_check>http://stickers.feeligo.com/forums/ipb/latest</hook_update_check>
+      <hook_requirements><![CDATA[a:3:{s:21:"required_applications";a:1:{s:6:"forums";a:3:{s:8:"app_name";s:6:"Forums";s:11:"min_version";i:32003;s:11:"max_version";i:0;}}s:20:"hook_php_version_min";s:0:"";s:20:"hook_php_version_max";s:0:"";}]]></hook_requirements>
+      <hook_version_human>1.0.0</hook_version_human>
+      <hook_version_long>1.0.0</hook_version_long>
+      <hook_extra_data/>
+      <hook_key>flgstickers</hook_key>
+      <hook_global_caches/>
+    </config>
+  </hookdata>
+  <hookfiles>
+    <file>
+      <hook_file_real>flgstickers.php</hook_file_real>
+      <hook_type>templateHooks</hook_type>
+      <hook_classname>FeeligoStickers</hook_classname>
+      <hook_data><![CDATA[a:8:{s:12:"dataLocation";s:0:"";s:14:"libApplication";s:0:"";s:15:"classToOverload";s:0:"";s:9:"skinGroup";s:12:"skin_editors";s:12:"skinFunction";s:6:"editor";s:4:"type";s:2:"if";s:2:"id";s:10:"showEditor";s:8:"position";s:12:"post.startif";}]]></hook_data>
+      <hooks_source><![CDATA[<?php
+
+class FeeligoStickers {
+  protected $registry;
+
+
+  public function __construct() {
+    $this->registry = ipsRegistry::instance();
+  }
+
+
+  public function getOutput() {
+    return;
+  }
+
+
+  public function replaceOutput($output, $key) {
+    $template = $this->registry->output->getTemplate('editors'); 
+    $functionData = $template->functionData['editor'];
+        //var_dump($this->registry->class_localization);
+    if (is_array($functionData) && count($functionData)) {
+      // insert the JS loader right after the <body> tag
+      $output = $this->insert_loader_js($output);
+      // insert the placeholder div
+      $output = $this->insert_placeholder_div($output);
+    }
+    return $output;
+  }
+
+
+  // returns the ID of the authenticated user, null if no user
+  protected function _current_user_id() {
+    $d = $this->registry->member()->fetchMemberData();
+    return isset($d['member_id']) && ($id = $d['member_id']) > 0 ? $id : null;
+  }
+
+
+  // inserts the loader JS and returns the modified $output
+  protected function insert_loader_js($output) {
+    // locate the opening <body> tag and insert right after it
+    $pos = $this->_pos_after($output, '<body', '>');
+    if ($pos !== false) {
+      $output = $this->_insert_at($output, $this->_loader_js(), $pos);
+    } else {
+      $output .= $this->_error_html('could not find opening body tag');
+    }
+    return $output;
+  }
+
+
+  // inserts the placeholder <div> and returns the modified $output
+  protected function insert_placeholder_div($output) {
+    $pos = $this->_pos_after($output, '<div', 'ipsPostForm_sidebar');
+    if ($pos !== false) {
+      // we have a sidebar: find where the closing </div> is,
+      // and insert just before it (as last child)
+      $pos = $this->_closing_tag_pos($output, 'div', $pos);
+      if ($pos === false) {
+        // something went wrong finding the closing div : insert anyway
+        // after the opening div (as first child)
+        $pos = $this->_pos_after($output, '>', $pos);
+      }
+      // insert the placeholder <div> with .ipsPostForm_sidebar_block class
+      $output = $this->_insert_at($output,
+        $this->_placeholder_div('ipsPostForm_sidebar_block'), $pos);
+    } else {
+      // no sidebar - this happens for quick reply editor
+      if (($o_pos = strpos($output, '<textarea id="editor')) !== false) {
+        $placeholder_div = $this->_placeholder_div_quick_reply();
+        $output = $this->_wrap_tag($output, 'textarea', $o_pos,
+          $placeholder_div.'<div class="f-textarea-wrapper">',
+          '</div>');
+      }
+    }
+    return $output;
+  }
+
+
+  // finds the first HTML $tag starting at $pos, finds its closing matching tag,
+  // and inserts $before before it and $after after it
+  private function _wrap_tag($str, $tag, $pos, $before, $after) {
+    if (($o_pos = strpos($str, '<'.$tag, $pos)) !== false &&
+        ($c_pos = $this->_closing_tag_pos($str, $tag, $o_pos + 1)) !== false) {
+      $str = $this->_insert_at($str, $after, $c_pos + strlen($tag) + 3);
+      $str = $this->_insert_at($str, $before, $o_pos);
+    }
+    return $str;
+  }
+
+
+  // returns a HTML comment used to display an error message
+  // (useful for debugging and support intervention)
+  private function _error_html($message) {
+    return "\n<!--flg:error $message -->\n";
+  }
+
+
+  // returns i+1 where i is the position of the last character of $beg,
+  // or the last character of the first occurrence of $end after $beg,
+  // search starts at $last
+  private function _pos_after($str, $beg, $end = null, $last = null) {
+    $pos = strpos($str, $beg, $last ? $last : 0);
+    if ($pos !== false) {
+      $pos += strlen($beg);
+      if ($end) {
+        return $this->_pos_after($str, $end, null, $pos);  
+      }
+    }
+    return $pos;
+  }
+
+
+  // inserts $new into $str at position $pos
+  private function _insert_at($str, $new, $pos) {
+    return substr_replace($str, $new, $pos, 0);
+  }
+
+
+  // finds a matching closing $tag starting at $index
+  // ignore other <$tag> opened after $index
+  private function _closing_tag_pos($str, $tag, $index) {
+    $o_pos = strpos($str, '<'.$tag, $index);
+    $c_pos = strpos($str, '</'.$tag.'>', $index);
+    if ($o_pos === false || $c_pos < $o_pos) {
+      // we have found the closing tag
+      return $c_pos;
+    }
+    // there is another $tag before the closing one : we need to find where
+    // that tag ends and start again from there
+    $o_pos = $this->_closing_tag_pos($str, $tag, $o_pos + strlen($tag) + 1);
+    return $this->_closing_tag_pos($str, $tag, $o_pos + strlen($tag) + 3);
+  }
+
+
+  // placeholder <div> with optional CSS class name
+  private function _placeholder_div($class = null) {
+    $class = $class && strlen($class) ? " class=\"$class\"" : '';
+    return "<div id=\"fstk_container\"$class></div>";
+  }
+
+
+  // placeholder <div> for the quick reply, with its CSS to position it to the
+  // right of the quick reply text editor
+  private function _placeholder_div_quick_reply() {
+    $div = $this->_placeholder_div($class = 'f-quick-reply');
+    $css = <<<FLGCSS
+#fstk_container.$class.f-loaded { width: 200px; float: right; }
+#fstk_container.$class.f-loaded + .f-textarea-wrapper { padding-right: 200px; }
+FLGCSS;
+    return "<style type=\"text/css\">$css</style>".$div;
+  }
+
+
+  // the loader JS script which gets added to the page
+  private function _loader_js() {
+    $p_name = 'ipb';
+    $p_version = IPB_VERSION;
+    $f_host = defined('FLG_HOST') ? FLG_HOST : 'stickersapp.feeligo.com';
+    $uid = ($uid = $this->_current_user_id()) !== null ? $uid : '';
+    $js = <<<FLGJS
+(function(f,ee,l,i,g,o){f[l]=f[l]||{};o&&(o+='').length?(f[l].context={viewer:
+{id:o},platform:{name:i,version:g}})&&(o='-'+o):(o='');(function(s,t,k,r){
+t=ee.createElement(r='script');k=ee.getElementsByTagName(r)[0];t.async=1;t.src=s;
+k.parentNode.insertBefore(t,k);})('http://$f_host/'+
+ee.location.hostname+'/loader'+o+'.js');})
+(window,document,'flg','$p_name','$p_version','$uid');
+FLGJS;
+    return "<script type=\"text/javascript\">$js</script>";
+  }
+
+}
+]]></hooks_source>
+    </file>
+  </hookfiles>
+  <hookextras_settings/>
+  <hookextras_language/>
+  <hookextras_modules/>
+  <hookextras_help/>
+  <hookextras_templates/>
+  <hookextras_css/>
+  <hookextras_replacements/>
+  <hookextras_tasks/>
+  <hookextras_database_create/>
+  <hookextras_database_alter/>
+  <hookextras_database_update/>
+  <hookextras_database_insert/>
+</hookexport>
