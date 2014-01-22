@@ -45,8 +45,6 @@ class FeeligoStickers {
     if (is_array($functionData) && count($functionData)) {
       // insert the JS loader right after the <body> tag
       $output = $this->insert_loader_js($output);
-      // insert the placeholder div
-      $output = $this->insert_placeholder_div($output);
     }
     return $output;
   }
@@ -69,46 +67,6 @@ class FeeligoStickers {
       $output .= $this->_error_html('could not find opening body tag');
     }
     return $output;
-  }
-
-
-  // inserts the placeholder <div> and returns the modified $output
-  protected function insert_placeholder_div($output) {
-    $pos = $this->_pos_after($output, '<div', 'ipsPostForm_sidebar');
-    if ($pos !== false) {
-      // we have a sidebar: find where the closing </div> is,
-      // and insert just before it (as last child)
-      $pos = $this->_closing_tag_pos($output, 'div', $pos);
-      if ($pos === false) {
-        // something went wrong finding the closing div : insert anyway
-        // after the opening div (as first child)
-        $pos = $this->_pos_after($output, '>', $pos);
-      }
-      // insert the placeholder <div> with .ipsPostForm_sidebar_block class
-      $output = $this->_insert_at($output,
-        $this->_placeholder_div('ipsPostForm_sidebar_block'), $pos);
-    } else {
-      // no sidebar - this happens for quick reply editor
-      if (($o_pos = strpos($output, '<textarea id="editor')) !== false) {
-        $placeholder_div = $this->_placeholder_div_quick_reply();
-        $output = $this->_wrap_tag($output, 'textarea', $o_pos,
-          $placeholder_div.'<div class="f-textarea-wrapper">',
-          '</div>');
-      }
-    }
-    return $output;
-  }
-
-
-  // finds the first HTML $tag starting at $pos, finds its closing matching tag,
-  // and inserts $before before it and $after after it
-  private function _wrap_tag($str, $tag, $pos, $before, $after) {
-    if (($o_pos = strpos($str, '<'.$tag, $pos)) !== false &&
-        ($c_pos = $this->_closing_tag_pos($str, $tag, $o_pos + 1)) !== false) {
-      $str = $this->_insert_at($str, $after, $c_pos + strlen($tag) + 3);
-      $str = $this->_insert_at($str, $before, $o_pos);
-    }
-    return $str;
   }
 
 
@@ -137,41 +95,6 @@ class FeeligoStickers {
   // inserts $new into $str at position $pos
   private function _insert_at($str, $new, $pos) {
     return substr_replace($str, $new, $pos, 0);
-  }
-
-
-  // finds a matching closing $tag starting at $index
-  // ignore other <$tag> opened after $index
-  private function _closing_tag_pos($str, $tag, $index) {
-    $o_pos = strpos($str, '<'.$tag, $index);
-    $c_pos = strpos($str, '</'.$tag.'>', $index);
-    if ($o_pos === false || $c_pos < $o_pos) {
-      // we have found the closing tag
-      return $c_pos;
-    }
-    // there is another $tag before the closing one : we need to find where
-    // that tag ends and start again from there
-    $o_pos = $this->_closing_tag_pos($str, $tag, $o_pos + strlen($tag) + 1);
-    return $this->_closing_tag_pos($str, $tag, $o_pos + strlen($tag) + 3);
-  }
-
-
-  // placeholder <div> with optional CSS class name
-  private function _placeholder_div($class = null) {
-    $class = $class && strlen($class) ? " class=\"$class\"" : '';
-    return "<div id=\"fstk_container\"$class></div>";
-  }
-
-
-  // placeholder <div> for the quick reply, with its CSS to position it to the
-  // right of the quick reply text editor
-  private function _placeholder_div_quick_reply() {
-    $div = $this->_placeholder_div($class = 'f-quick-reply');
-    $css = <<<FLGCSS
-#fstk_container.$class.f-loaded { width: 200px; float: right; }
-#fstk_container.$class.f-loaded + .f-textarea-wrapper { padding-right: 200px; }
-FLGCSS;
-    return "<style type=\"text/css\">$css</style>".$div;
   }
 
 
