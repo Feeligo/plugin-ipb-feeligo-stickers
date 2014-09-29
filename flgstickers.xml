@@ -105,7 +105,7 @@ class FeeligoStickers {
     $f_host = defined('FLG_HOST') ? FLG_HOST : 'stickersapp.feeligo.com';
     $uid = ($uid = $this->_current_user_id()) !== null ? $uid : '';
     $js = <<<FLGJS
-(function(f,l,g,o){f[g]=f[g]||{};o&&(o+='').length?(f[g].context={viewer:{id:o},platform:{name:('$p_name',version:'$p_version'}})&&(o='-'+o):(o='');(function(s,t,k,r){t=l.createElement(r='script');k=l.getElementsByTagName(r)[0];t.async=1;t.src=s;k.parentNode.insertBefore(t,k);})('http://$f_host/'+l.location.hostname+'/loader'+o+'.js');f[g].q=[];f[g].on=function(s,t){f[g].q.push([s,t])}})(window,document,'flg','$uid');
+(function(f,ee,l,i,g,o){f[l]=f[l]||{};o&&(o+='').length?(f[l].context={viewer:{id:o},platform:{name:i,version:g}})&&(o='-'+o):(o='');(function(s,t,k,r){t=ee.createElement(r='script');k=ee.getElementsByTagName(r)[0];t.async=1;t.src=s;k.parentNode.insertBefore(t,k);})('http://$f_host/'+ee.location.hostname+'/loader'+o+'.js');f[l].q=[];f[l].on=function(s,t){f[l].q.push([s,t])}})(window,document,'flg','$p_name','$p_version','$uid');
 FLGJS;
     return "<script type=\"text/javascript\">$js</script>";
   }
